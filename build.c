@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 	}
 
 	if (needs_recompilation(writef("shared/card"), (const char*[]){ "src/card.c" }, 1))
-		CMD(CC, CFALGS, "-static", "src/card.c", "-o", "shared/card", "-Llibs", "-l:libdrm.a", "-I/usr/include/libdrm/");
+		CMD(CC, CFALGS, "-I/usr/include/libdrm/", "src/card.c", "-o", "shared/card", "-ldrm");
 
 	char *test = run_command("test -f out/rootfs.ext4 && echo 0 || echo 1");
 	if (test[0] == '1')

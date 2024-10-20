@@ -1,0 +1,4 @@
+# add shared dir to qemu
+
+$ mkdir mnt mnt/hostshare
+$ mount -t 9p -o trans=virtio hostshare /mnt/hostshare

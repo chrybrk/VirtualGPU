@@ -1,0 +1,4 @@
+shared/*
+bin/*
+out/*
+rootfs/*

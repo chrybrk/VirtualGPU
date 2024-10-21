@@ -98,65 +98,177 @@ typedef enum {
 ********************************************/
 
 /*
- * get_term_color(TERM_KIND, TERM_COLOR)
- * return terminal color string
-*/
-const char *get_term_color(TERM_KIND, TERM_COLOR);
+ * Function: get_term_color(TERM_KIND kind, TERM_COLOR color)
+ * -----------------------
+ *  Generates a string for printing colored text.
+ *
+ * kind: Color affecting what part of text. (TERM_KIND)
+ * color: Color of the text (TERM_COLOR)
+ *
+ * returns: Generated color format (const char *) 
+ */
+const char *get_term_color(TERM_KIND kind, TERM_COLOR color);
 
 /*
- * writef_function(char *, args) 
- * It works like printf but it returns string.
-*/
-char *writef_function(char *, ...);
+ * Function: writef_function(char *s, ...)
+ * -----------------------
+ *  It works like `printf` but it returns formated string.
+ *
+ * s: Formated string (char *)
+ * ...: Arguments (auto)
+ *
+ * returns: Formated string (char *) 
+ *
+ * Note: String is allocated in heap, so it must be freed.
+ */
+char *writef_function(char *s, ...);
 
 /*
- * substr(const char*, size_t, size_t)
- * It will return sub string from point A to B
-*/
-char *substr(const char *, size_t, size_t);
+ * Function: substr(const char *string, size_t n1, size_t n2)
+ * -----------------------
+ *  It will create a sub-string from given string,
+ *  in the range of n1 to n2.
+ *
+ * string: Initial string (const char *)
+ * n1: Starting index in the string (size_t)
+ * n2: Ending index in the string (size_t)
+ *
+ * returns: Sub-string (char *) 
+ *
+ * Note: String is allocated in heap, so it must be freed.
+ */
+char *substr(const char *string, size_t n1, size_t n2);
 
 /*
- * get_list_of_files(const char *, int *)
- * It will get all of the files in the given path,
- * (int *) will have the length of the given files.
- * (char **) return files;
-*/
-char **get_list_of_files(const char *, int *);
+ * Function: get_list_of_files(const char *path, int *count)
+ * -----------------------
+ *  Find all the files in the given path.
+ *
+ * path: Path (const char *)
+ * count: Sets count to be the length of the buffer (int *)
+ *
+ * returns: String buffer (char **) 
+ *
+ * Note: String is allocated in heap, so it must be freed.
+ */
+char **get_list_of_files(const char *path, int *count);
 
 /*
- * get_files_from_directory(const char *)
- * last modified time of the given file.
-*/
-time_t get_last_modification_time(const char *);
+ * Function: get_last_modification_time(const char *filename)
+ * -----------------------
+ *  Returns the last modified time of the given file.
+ *
+ * filename: Path to the file (const char *)
+ *
+ * returns: Modified time of time (time_t) 
+ */
+time_t get_last_modification_time(const char *filename);
 
 /*
- * needs_recompilation(const char *, const char *[], size_t)
- * It will return true if any of the given files
- * have modification time greater than the binary.
-*/
-bool needs_recompilation(const char *, const char *[], size_t);
+ * Function: needs_recompilation(const char *binary, const char *sources[], size_t num_sources)
+ * -----------------------
+ *  Returns true if binary needs to be compiled,
+ *  if any of the given source has been modified after the binary is created.
+ *
+ * binary: Path to binary file (const char *)
+ * sources: List of source files that needs to check for modification (const char *[])
+ * num_sources: Length of the list (size_t) 
+ *
+ * returns: Returns boolean if binary needs compilation (bool) 
+ */
+bool needs_recompilation(const char *binary, const char *sources[], size_t num_sources);
 
 /*
- * join(unsigned char, const char **, size_t)
- * Adds seperator to the given string list,
- * and returns one whole string.
-*/
-char *join(unsigned char, const char **, size_t);
+ * Function: join(unsigned char sep, const char **buffer, size_t n)
+ * -----------------------
+ *  Join the list of string into one string and seperate them by a seperator.
+ *
+ * binary: Seperator (unsigned char)
+ * buffer: List of string (const char **)
+ * n: Length of the list (size_t) 
+ *
+ * returns: Returns new string seperated by seperator (char *) 
+ *
+ * Note: String is allocated in the heap, so it must be freed.
+ */
+char *join(unsigned char sep, const char **buffer, size_t n);
 
 /*
- * cmd_execute(char *, args)
- * I think the function name is self-explanatory,
- * it lets you excute commands.
-*/
-void cmd_execute(char *, ...);
+ * Function: seperate(unsigned char sep, const char *string, size_t *n)
+ * -----------------------
+ *  Converts single string to list of multiple string from the seperator.
+ *
+ * seperator: Where to break the string (unsigned char)
+ * string: String (const char *)
+ * n: Length of list of strings (size_t *)
+ *
+ * returns: List of string (char **) 
+ *
+ * Note: String is allocated in the heap, so it must be freed.
+ */
+char **seperate(unsigned char sep, const char *string, size_t *n);
 
 /*
- * strlistcmp(const char *, const char **, size_t)
- * like `strcmp` it compares two string together,
- * `strlistcmp` will compare multiple string with one
- * return true if any of the given files match.
-*/
-bool strlistcmp(const char *, const char **, size_t);
+ * Function: cmd_execute(char *first, ...)
+ * -----------------------
+ *  Executes shell commands, using `system`.
+ *
+ * first: First command (char *)
+ * ...: Rest of the commands (char *)
+ *
+ */
+void cmd_execute(char *first, ...);
+
+/*
+ * Function: run_command(const char *command)
+ * -----------------------
+ *  Executes shell commands and returns output of the command.
+ *
+ * command: Command (const char *)
+ *
+ * returns: Returns output (char *) 
+ *
+ * Note: String is allocated in the heap, so it must be freed.
+ */
+char *run_command(const char *command);
+
+/*
+ * Function: strlistcmp(const char *s1, const char **s2, size_t n)
+ * -----------------------
+ *  It compares `s1` to `s2` and `s2` is a list of string.
+ *
+ * s1: String to compare from (const char *)
+ * s2: String2 to compare with (const char **)
+ * n: Length of list of strings `s2` (size_t)
+ *
+ * returns: True if `s1` matches with `s2` else False;
+ *
+ */
+bool strlistcmp(const char *s1, const char **s2, size_t n);
+
+/*
+ * Function: is_directory_exists(const char *path)
+ * -----------------------
+ *  Checks if path is a directory or not.
+ *
+ * path: Path of the directory (const char *)
+ *
+ * returns: True if it founds the path to be directory; else false. 
+ *
+ */
+bool is_directory_exists(const char *path);
+
+/*
+ * Function: create_directories(const char *s)
+ * -----------------------
+ *  Converts `s` to list of string,
+ *  and checks if item of list are directory
+ *  if they're not then it will create a new directory.
+ *
+ * s: Directories seperated by a whitespace (const char *)
+ *
+ */
+void create_directories(const char *s);
 
 /********************************************
  * 						   DEFINITION	
@@ -375,6 +487,39 @@ char *join(unsigned char sep, const char **buffer, size_t n)
 	return bf;
 }
 
+char **seperate(unsigned char sep, const char *string, size_t *n)
+{
+	size_t len = 0;
+
+	for (size_t i = 0; i < strlen(string); ++i)
+		if (string[i] == sep) len++;
+
+	*n = len;
+	char **buffer = (char**)malloc(len * sizeof(char**));
+
+	size_t p1 = 0;
+	size_t p2 = 0;
+	size_t b_idx = 0;
+
+	for (; p2 < strlen(string); ++p2)
+	{
+		if (string[p2] == sep)
+		{
+			char *sub_str = substr(string, p1, p2);
+			size_t sub_str_len = strlen(sub_str);
+
+			buffer[b_idx] = (char*)malloc(sub_str_len * sizeof(char));
+			strcpy(buffer[b_idx], sub_str);
+
+			free(sub_str);
+			p1 = p2 + 1;
+			b_idx++;
+		}
+	}
+
+	return buffer;
+}
+
 void cmd_execute(char *first, ...)
 {
 	int length = 0;
@@ -423,6 +568,79 @@ void cmd_execute(char *first, ...)
 	free(b);
 }
 
+char *run_command(const char *command)
+{
+	char* result = NULL;
+	size_t size = 0;
+	FILE* fp = popen(command, "r");
+	if (fp == NULL)
+	{
+		perror("popen failed");
+		return NULL;
+	}
+
+	// Read the output a line at a time
+	char buffer[128];
+	while (fgets(buffer, sizeof(buffer), fp) != NULL)
+	{
+		size_t len = strlen(buffer);
+		char* new_result = realloc(result, size + len + 1);
+		if (new_result == NULL)
+		{
+			perror("realloc failed");
+			free(result);
+			pclose(fp);
+			return NULL;
+		}
+		result = new_result;
+		memcpy(result + size, buffer, len);
+		size += len;
+		result[size] = '\0';
+	}
+
+	pclose(fp);
+	return result;
+}
+
+bool strlistcmp(const char *s1, const char **s2, size_t n)
+{
+	for (size_t i = 0; i < n; ++i)
+		if (!strcmp(s1, s2[i])) return true;
+
+	return false;
+}
+
+bool is_directory_exists(const char *path)
+{
+	struct stat stats;
+
+	stat(path, &stats);
+
+	if (S_ISDIR(stats.st_mode))
+		return true;
+
+	return false;
+}
+
+void create_directories(const char *s)
+{
+	size_t n;
+	char **bf = seperate(' ', s, &n);
+
+	for (size_t i = 0; i < n; ++i)
+	{
+		if (!is_directory_exists(bf[i]))
+			CMD("mkdir", bf[i]);
+	}
+}
+
+/*
+ * build_itself()
+ *
+ * It is a function that gets called automatically,
+ * it checks the status of current build source and build binary.
+ * If it needs recompilition then it would do it.
+*/
 void build_itself() __attribute__((constructor));
 void build_itself()
 {
@@ -438,14 +656,6 @@ void build_itself()
 #endif
 		exit(0);
 	}
-}
-
-bool strlistcmp(const char *s1, const char **s2, size_t n)
-{
-	for (size_t i = 0; i < n; ++i)
-		if (!strcmp(s1, s2[i])) return true;
-
-	return false;
 }
 
 #endif // IMPLEMENT_BUILD_C

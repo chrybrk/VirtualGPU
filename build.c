@@ -5,72 +5,6 @@
 #define CC "gcc"
 #define CFALGS "-O2", "-g0", "-static"
 
-char* run_command(const char* command) {
-	char* result = NULL;
-	size_t size = 0;
-	FILE* fp = popen(command, "r");
-	if (fp == NULL)
-	{
-		perror("popen failed");
-		return NULL;
-	}
-
-	// Read the output a line at a time
-	char buffer[128];
-	while (fgets(buffer, sizeof(buffer), fp) != NULL)
-	{
-		size_t len = strlen(buffer);
-		char* new_result = realloc(result, size + len + 1);
-		if (new_result == NULL)
-		{
-			perror("realloc failed");
-			free(result);
-			pclose(fp);
-			return NULL;
-		}
-		result = new_result;
-		memcpy(result + size, buffer, len);
-		size += len;
-		result[size] = '\0';
-	}
-
-	pclose(fp);
-	return result;
-}
-
-char **get_list_from_string(const char *string, unsigned char seperator, size_t *n)
-{
-	size_t len = 0;
-
-	for (size_t i = 0; i < strlen(string); ++i)
-		if (string[i] == seperator) len++;
-
-	*n = len;
-	char **buffer = (char**)malloc(len * sizeof(char**));
-
-	size_t p1 = 0;
-	size_t p2 = 0;
-	size_t b_idx = 0;
-
-	for (; p2 < strlen(string); ++p2)
-	{
-		if (string[p2] == seperator)
-		{
-			char *sub_str = substr(string, p1, p2);
-			size_t sub_str_len = strlen(sub_str);
-
-			buffer[b_idx] = (char*)malloc(sub_str_len * sizeof(char));
-			strcpy(buffer[b_idx], sub_str);
-
-			free(sub_str);
-			p1 = p2 + 1;
-			b_idx++;
-		}
-	}
-
-	return buffer;
-}
-
 const char *files[] = {
 	"kbd",
 	"test"
@@ -80,6 +14,8 @@ void create_kernel_essentials(const char *path, const char *rootfs_out, const ch
 
 int main(int argc, char **argv)
 {
+	create_directories("bin out shared");
+
 	size_t len = sizeof(files) / sizeof(files[0]);
 
 	for (size_t i = 0; i < len; ++i)
@@ -143,7 +79,7 @@ void create_kernel_essentials(const char *path, const char *rootfs_out, const ch
 	CMD("cp", substr(busybox_path, 0, strlen(busybox_path) - 1), "bin/");
 
 	char *busybox_items = run_command("busybox --list");
-	size_t n; char **busybox_item_list = get_list_from_string(busybox_items, '\n', &n);
+	size_t n; char **busybox_item_list = seperate('\n', busybox_items, &n);
 
 	for (size_t i = 0; i < n; ++i)
 		if (!strcmp(busybox_item_list[i], "busybox")) continue;

@@ -79,7 +79,7 @@ void create_kernel_essentials(const char *path, const char *rootfs_out, const ch
 	CMD("cp", substr(busybox_path, 0, strlen(busybox_path) - 1), "bin/");
 
 	char *busybox_items = run_command("busybox --list");
-	size_t n; char **busybox_item_list = seperate('\n', busybox_items, &n);
+	size_t n; char **busybox_item_list = separate('\n', busybox_items, &n);
 
 	for (size_t i = 0; i < n; ++i)
 		if (!strcmp(busybox_item_list[i], "busybox")) continue;

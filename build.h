@@ -181,20 +181,20 @@ bool needs_recompilation(const char *binary, const char *sources[], size_t num_s
 /*
  * Function: join(unsigned char sep, const char **buffer, size_t n)
  * -----------------------
- *  Join the list of string into one string and seperate them by a seperator.
+ *  Join the list of string into one string and separate them by a seperator.
  *
- * binary: Seperator (unsigned char)
+ * binary: Separator (unsigned char)
  * buffer: List of string (const char **)
  * n: Length of the list (size_t) 
  *
- * returns: Returns new string seperated by seperator (char *) 
+ * returns: Returns new string separated by seperator (char *) 
  *
  * Note: String is allocated in the heap, so it must be freed.
  */
 char *join(unsigned char sep, const char **buffer, size_t n);
 
 /*
- * Function: seperate(unsigned char sep, const char *string, size_t *n)
+ * Function: separate(unsigned char sep, const char *string, size_t *n)
  * -----------------------
  *  Converts single string to list of multiple string from the seperator.
  *
@@ -206,7 +206,7 @@ char *join(unsigned char sep, const char **buffer, size_t n);
  *
  * Note: String is allocated in the heap, so it must be freed.
  */
-char **seperate(unsigned char sep, const char *string, size_t *n);
+char **separate(unsigned char sep, const char *string, size_t *n);
 
 /*
  * Function: cmd_execute(char *first, ...)
@@ -265,7 +265,7 @@ bool is_directory_exists(const char *path);
  *  and checks if item of list are directory
  *  if they're not then it will create a new directory.
  *
- * s: Directories seperated by a whitespace (const char *)
+ * s: Directories separated by a whitespace (const char *)
  *
  */
 void create_directories(const char *s);
@@ -487,7 +487,7 @@ char *join(unsigned char sep, const char **buffer, size_t n)
 	return bf;
 }
 
-char **seperate(unsigned char sep, const char *string, size_t *n)
+char **separate(unsigned char sep, const char *string, size_t *n)
 {
 	size_t len = 0;
 
@@ -612,26 +612,30 @@ bool strlistcmp(const char *s1, const char **s2, size_t n)
 
 bool is_directory_exists(const char *path)
 {
-	struct stat stats;
-
-	stat(path, &stats);
-
-	if (S_ISDIR(stats.st_mode))
-		return true;
-
-	return false;
+	char *t = run_command(writef("test -d %s && echo 0 || echo 1", path));
+	return !atoi(t);
 }
 
 void create_directories(const char *s)
 {
 	size_t n;
-	char **bf = seperate(' ', s, &n);
+	char **bf = separate(' ', s, &n);
 
+	size_t len = 0;
 	for (size_t i = 0; i < n; ++i)
 	{
+		len += strlen(bf[i]) + 1; // later this will be used for seprating last element.
 		if (!is_directory_exists(bf[i]))
 			CMD("mkdir", bf[i]);
 	}
+
+	// get last element from the string
+	// because the string ends and it might not have whitespace
+	// so it would not separate from the string.
+	char *last_element = substr(s, len, strlen(s));
+
+	if (!is_directory_exists(last_element))
+		CMD("mkdir", last_element);
 }
 
 /*

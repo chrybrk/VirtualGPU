@@ -1,87 +1,10 @@
-# add shared dir to qemu
+# TODO
+- [ ] Show something / anything on the screen.
 
+# add shared dir to qemu
 $ mkdir mnt mnt/hostshare
 $ mount -t 9p -o trans=virtio hostshare /mnt/hostshare
 
-#!/bin/sh
-
-qemu-system-x86_64 	-m 128 \
-										-drive file=out/rootfs.ext4,format=raw \
-										-initrd out/initramfs.cpio \
-										-kernel kernel/bzImage \
-										-append "root=/dev/ram0 rw console=ttyS0" \
-										-device virtio-gpu \
-										-display gtk \
-										-virtfs local,path=./shared,mount_tag=hostshare,security_model=none,writeout=immediate
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <errno.h>
-#include <signal.h>
-
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <libdrm/drm.h>
-#include <libdrm/drm_mode.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-
-int main(int argc, char **argv)
-{
-	const char *card = argv[1];
-
-	int fd = open(card, O_RDWR | O_CLOEXEC);
-	if (fd < 0)
-	{
-		perror("Could not open dri device: ");
-		return -EINVAL;
-	}
-
-	drmModeResPtr res = drmModeGetResources(fd);
-	if (!res)
-	{
-		perror("Could not get drm resources: ");
-		return -EINVAL;
-	}
-
-	printf("count_connectors: %d\n", res->count_connectors);
-
-	drmModeConnectorPtr connector = drmModeGetConnectorCurrent(fd, res->connectors[0]);
-	if (!connector)
-	{
-		perror("Could not get connector: ");
-		return -EINVAL;
-	}
-
-	printf("count_modes: %d\n", connector->count_modes);
-
-	drmModeModeInfoPtr resolution = 0;
-	for (int i = 0; i < connector->count_modes; i++) {
-		resolution = &connector->modes[i];
-		if (resolution->type & DRM_MODE_TYPE_PREFERRED)
-			break;
-	}
-
-	printf(
-			"clock: %d\n"
-		  "hdisplay: %d, hsync_start: %d, hsync_end: %d, htotal: %d, hskew: %d\n"
-		  "vdisplay: %d, vsync_start: %d, vsync_end: %d, vtotal: %d, vscan: %d\n"
-			"vrefresh: %d\n"
-			"flags: %d\n"
-			"type: %d\n"
-			"name: %s\n",
-			resolution->clock,
-			resolution->hdisplay, resolution->hsync_start, resolution->hsync_end, resolution->htotal, resolution->hskew,
-			resolution->vdisplay, resolution->vsync_start, resolution->vsync_end, resolution->vtotal, resolution->vscan,
-			resolution->vrefresh,
-			resolution->flags,
-			resolution->type,
-			resolution->name
-	);
-
-	return 0;
-}
+# Refrences
+- Accessing a DRM FrameBuffer: https://embear.ch/blog/drm-framebuffer
+- drm-memory(7) (manpage): https://manpages.debian.org/testing/libdrm-dev/drm-memory.7.en.html

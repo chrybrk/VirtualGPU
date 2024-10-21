@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <libdrm/drm.h>
@@ -12,156 +13,163 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-// Function to find a connected connector
-drmModeConnector *find_connector(int drm_fd, drmModeRes *resources) {
-    for (int i = 0; i < resources->count_connectors; i++) {
-        drmModeConnector *connector = drmModeGetConnector(drm_fd, resources->connectors[i]);
-        if (connector->connection == DRM_MODE_CONNECTED) {
-            return connector;
-        }
-        drmModeFreeConnector(connector);
-    }
-    return NULL;
-}
+#define DEBUG
 
-// Function to find an encoder
-drmModeEncoder *find_encoder(int drm_fd, drmModeRes *resources, drmModeConnector *connector) {
-    if (connector->encoder_id) {
-        return drmModeGetEncoder(drm_fd, connector->encoder_id);
-    }
-    return NULL;
-}
+int main(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		printf("Err: provide dri device.\n");
+		return -EINVAL;
+	}
 
-int main() {
-    int drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
-    if (drm_fd < 0) {
-        fprintf(stderr, "Failed to open DRM device: %s\n", strerror(errno));
-        return -1;
-    }
+	const char *card = argv[1];
 
-    drmModeRes *resources = drmModeGetResources(drm_fd);
-    if (!resources) {
-        fprintf(stderr, "Failed to get DRM resources: %s\n", strerror(errno));
-        close(drm_fd);
-        return -1;
-    }
+	int fd = open(card, O_RDWR | O_CLOEXEC);
+	if (fd < 0)
+	{
+		perror("Err: failed to open dri device: ");
+		return -EINVAL;
+	}
 
-    drmModeConnector *connector = find_connector(drm_fd, resources);
-    if (!connector) {
-        fprintf(stderr, "No connected connector found\n");
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+	drmModeResPtr res = drmModeGetResources(fd);
+	if (!res)
+	{
+		perror("Err: cannot get drm resources: ");
+		return -EINVAL;
+	}
 
-    drmModeEncoder *encoder = find_encoder(drm_fd, resources, connector);
-    if (!encoder) {
-        fprintf(stderr, "Failed to find encoder\n");
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+#ifdef DEBUG
+	printf(
+		"count_fbs: %d\n"
+		"count_crtcs: %d\n"
+		"count_connectors: %d\n"
+		"count_encoders: %d\n"
+		"min_width: %d, max_width: %d\n"
+		"min_height: %d, max_height: %d\n",
+		res->count_fbs,
+		res->count_crtcs,
+		res->count_connectors,
+		res->count_encoders,
+		res->min_width, res->max_width,
+		res->min_height, res->max_height
+	);
+#endif
 
-    drmModeCrtc *crtc = drmModeGetCrtc(drm_fd, encoder->crtc_id);
-    if (!crtc) {
-        fprintf(stderr, "Failed to get CRTC\n");
-        drmModeFreeEncoder(encoder);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+	drmModeConnectorPtr connector = drmModeGetConnectorCurrent(fd, res->connectors[0]);
+	if (!connector)
+	{
+		perror("Err: failed to get connector: ");
+		return -EINVAL;
+	}
 
-    // Select a mode
-    drmModeModeInfo mode = connector->modes[0];
+	drmModeModeInfoPtr resolution = 0;
+	for (int i = 0; i < connector->count_modes; i++) {
+		resolution = &connector->modes[i];
+		if (resolution->type & DRM_MODE_TYPE_PREFERRED)
+			break;
+	}
 
-    // Create a dumb buffer
-    struct drm_mode_create_dumb create_dumb = {0};
-    create_dumb.width = mode.hdisplay;
-    create_dumb.height = mode.vdisplay;
-    create_dumb.bpp = 32;
+#ifdef DEBUG
+	printf(
+			"clock: %d\n"
+		  "hdisplay: %d, hsync_start: %d, hsync_end: %d, htotal: %d, hskew: %d\n"
+		  "vdisplay: %d, vsync_start: %d, vsync_end: %d, vtotal: %d, vscan: %d\n"
+			"vrefresh: %d\n"
+			"flags: %d\n"
+			"type: %d\n"
+			"name: %s\n",
+			resolution->clock,
+			resolution->hdisplay, resolution->hsync_start, resolution->hsync_end, resolution->htotal, resolution->hskew,
+			resolution->vdisplay, resolution->vsync_start, resolution->vsync_end, resolution->vtotal, resolution->vscan,
+			resolution->vrefresh,
+			resolution->flags,
+			resolution->type,
+			resolution->name
+	);
+#endif
 
-    if (ioctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_dumb) < 0) {
-        fprintf(stderr, "Failed to create dumb buffer: %s\n", strerror(errno));
-        drmModeFreeCrtc(crtc);
-        drmModeFreeEncoder(encoder);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+	struct drm_mode_create_dumb creq;
+	struct drm_mode_destroy_dumb dreq;
+	struct drm_mode_map_dumb mreq;
+	uint32_t fb;
+	int ret;
 
-    uint32_t fb_id;
-    if (drmModeAddFB(drm_fd, create_dumb.width, create_dumb.height, 24, create_dumb.bpp, create_dumb.pitch, create_dumb.handle, &fb_id)) {
-        fprintf(stderr, "Failed to create framebuffer: %s\n", strerror(errno));
-        ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &create_dumb.handle);
-        drmModeFreeCrtc(crtc);
-        drmModeFreeEncoder(encoder);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+	uint8_t *map;
 
-    // Map the dumb buffer
-    struct drm_mode_map_dumb map_dumb = {0};
-    map_dumb.handle = create_dumb.handle;
-    if (ioctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb)) {
-        fprintf(stderr, "Failed to map dumb buffer: %s\n", strerror(errno));
-        drmModeRmFB(drm_fd, fb_id);
-        ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &create_dumb.handle);
-        drmModeFreeCrtc(crtc);
-        drmModeFreeEncoder(encoder);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+	memset(&creq, 0, sizeof(creq));
+	creq.width = resolution->hdisplay;
+	creq.height = resolution->vdisplay;
+	creq.bpp = 32;
+	
+	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq);
+	if (ret < 0)
+	{
+		perror("err: Failed to create dumb buffer: ");
+		return -EINVAL;
+	}
 
-    uint8_t *framebuffer = mmap(0, create_dumb.size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, map_dumb.offset);
-    if (framebuffer == MAP_FAILED) {
-        fprintf(stderr, "Failed to mmap framebuffer: %s\n", strerror(errno));
-        drmModeRmFB(drm_fd, fb_id);
-        ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &create_dumb.handle);
-        drmModeFreeCrtc(crtc);
-        drmModeFreeEncoder(encoder);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(resources);
-        close(drm_fd);
-        return -1;
-    }
+	ret = drmModeAddFB(fd, creq.width, creq.height, 24, creq.bpp, creq.pitch, creq.handle, &fb);
+	if (ret)
+	{
+		perror("err: Failed to create framebuffer: ");
+		return -EINVAL;
+	}
 
-		printf("width: %d, height: %d\n", create_dumb.width, create_dumb.height);
+	memset(&mreq, 0, sizeof(mreq));
+	mreq.handle = creq.handle;
 
-    // Fill the framebuffer with a solid color (e.g., red)
-    for (uint32_t y = 0; y < create_dumb.height; y++) {
-        for (uint32_t x = 0; x < create_dumb.width; x++) {
-            uint32_t pixel_offset = (y * create_dumb.pitch) + (x * 4);
-            framebuffer[pixel_offset] = 0xFF;        // Blue
-            framebuffer[pixel_offset + 1] = 0x00;    // Green
-            framebuffer[pixel_offset + 2] = 0x00;    // Red
-            framebuffer[pixel_offset + 3] = 0xFF;    // Alpha
-        }
-    }
+	ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
+	if (ret)
+	{
+		perror("err: DRM buffer preparation failed: ");
+		return -EINVAL;
+	}
 
-    // Set the CRTC
-    if (drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0, &connector->connector_id, 1, &mode)) {
-        fprintf(stderr, "Failed to set CRTC: %s\n", strerror(errno));
-    }
+	map = mmap(0, creq.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mreq.offset);
+	if (map == MAP_FAILED)
+	{
+		perror("err: Memory-mapping failed: ");
+		return -EINVAL;
+	}
 
-    // Wait for user input to exit
-    getchar();
+	/* clear framebuffer to 0 */
+	memset(map, 0, creq.size);
 
-    // Cleanup
-    munmap(framebuffer, create_dumb.size);
-    drmModeRmFB(drm_fd, fb_id);
-    ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &create_dumb.handle);
-    drmModeFreeCrtc(crtc);
-    drmModeFreeEncoder(encoder);
-    drmModeFreeConnector(connector);
-    drmModeFreeResources(resources);
-    close(drm_fd);
+	printf("[INFO]: Memory allocated for framebuffer.\n");
 
-    return 0;
+	/* get encoder */
+	drmModeEncoderPtr encoder = drmModeGetEncoder(fd, connector->encoder_id);
+	if (!encoder)
+	{
+		perror("err: Failed to get encoder: ");
+		return -EINVAL;
+	}
+
+	/* get crtc */
+	drmModeCrtcPtr crtc = drmModeGetCrtc(fd, encoder->crtc_id);
+
+	// Fill the framebuffer with a solid color (e.g., red)
+	for (uint32_t y = 0; y < creq.height; y++) {
+		for (uint32_t x = 0; x < creq.width; x++) {
+			uint32_t pixel_offset = (y * creq.pitch) + (x * 4);
+			map[pixel_offset] = 0xFF;        // Blue
+			map[pixel_offset + 1] = 0x00;    // Green
+			map[pixel_offset + 2] = 0xaa;    // Red
+			map[pixel_offset + 3] = 0xFF;    // Alpha
+		}
+	}
+
+	// Set the CRTC
+	if (drmModeSetCrtc(fd, crtc->crtc_id, fb, 0, 0, &connector->connector_id, 1, resolution))
+	{
+		perror("err: Failed to set CRTC: ");
+		return -EINVAL;
+	}
+
+	getchar();
+
+	// TODO: free
+
+	return 0;
 }

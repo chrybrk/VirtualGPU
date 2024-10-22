@@ -15,6 +15,27 @@ void create_kernel_essentials(const char *path, const char *rootfs_out, const ch
 int main(int argc, char **argv)
 {
 	create_directories("bin out shared");
+	
+	struct download_info d_infos[] = {
+		(struct download_info) {
+			.url = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.11.4.tar.xz",
+			.out_dir = "bin/",
+			.filename = "linux-6.11.4.tar.xz",
+			.extract = true,
+			.extract_in_dir = "bin/linux-6.11.4",
+			.tar_command = "tar xf"
+		},
+		(struct download_info) {
+			.url = "https://download.qemu.org/qemu-9.1.1.tar.xz",
+			.out_dir = "bin/",
+			.filename = "qemu-9.1.1.tar.xz",
+			.extract = true,
+			.extract_in_dir = "bin/qemu-9.1.1",
+			.tar_command = "tar xf"
+		},
+	};
+
+	download(sizeof(d_infos) / sizeof(d_infos[0]), d_infos);
 
 	size_t len = sizeof(files) / sizeof(files[0]);
 

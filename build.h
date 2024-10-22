@@ -83,6 +83,15 @@ typedef enum {
 	RESET
 } TERM_KIND;
 
+struct download_info
+{
+	const char *url;
+	const char *out_dir;
+	const char *filename;
+	bool extract;
+	const char *extract_in_dir;
+	const char *tar_command;
+};
 
 /********************************************
  * 						MACRO FUNCTIONS	
@@ -259,6 +268,18 @@ bool strlistcmp(const char *s1, const char **s2, size_t n);
 bool is_directory_exists(const char *path);
 
 /*
+ * Function: is_file_exists(const char *path)
+ * -----------------------
+ *  Checks if path is a file or not.
+ *
+ * path: Path of the file (const char *)
+ *
+ * returns: True if it founds the path to be file; else false. 
+ *
+ */
+bool is_file_exists(const char *path);
+
+/*
  * Function: create_directories(const char *s)
  * -----------------------
  *  Converts `s` to list of string,
@@ -269,6 +290,27 @@ bool is_directory_exists(const char *path);
  *
  */
 void create_directories(const char *s);
+
+/*
+ * Function: create_directories_from_path(const char *path)
+ * -----------------------
+ *  Create directory from sub-path, if they do not exist already.
+ *
+ * path: Path `xyz/path/some/dir`, it will check if any of the sub-directory. (const char *)
+ *
+ */
+void create_directories_from_path(const char *path);
+
+/*
+ * Function: download(size_t n, struct download_info d_info[n])
+ * -----------------------
+ *  Downloads using `curl` and extract (if needed) using tar.
+ *
+ * n: Size of download infos. (size_t)
+ * d_info: List of items (struct download_info)
+ * 
+ */
+void download(size_t n, struct download_info d_info[n])
 
 /********************************************
  * 						   DEFINITION	
@@ -494,6 +536,8 @@ char **separate(unsigned char sep, const char *string, size_t *n)
 	for (size_t i = 0; i < strlen(string); ++i)
 		if (string[i] == sep) len++;
 
+	len++;
+
 	*n = len;
 	char **buffer = (char**)malloc(len * sizeof(char**));
 
@@ -516,6 +560,14 @@ char **separate(unsigned char sep, const char *string, size_t *n)
 			b_idx++;
 		}
 	}
+
+	char *sub_str = substr(string, p1, strlen(string));
+	size_t sub_str_len = strlen(sub_str);
+
+	buffer[b_idx] = (char*)malloc(sub_str_len * sizeof(char));
+	strcpy(buffer[b_idx], sub_str);
+
+	free(sub_str);
 
 	return buffer;
 }
@@ -616,27 +668,66 @@ bool is_directory_exists(const char *path)
 	return !atoi(t);
 }
 
+bool is_file_exists(const char *path)
+{
+	char *t = run_command(writef("test -f %s && echo 0 || echo 1", path));
+	return !atoi(t);
+}
+
 void create_directories(const char *s)
 {
 	size_t n;
 	char **bf = separate(' ', s, &n);
 
-	size_t len = 0;
 	for (size_t i = 0; i < n; ++i)
 	{
-		len += strlen(bf[i]) + 1; // later this will be used for seprating last element.
 		if (!is_directory_exists(bf[i]))
 			CMD("mkdir", bf[i]);
 	}
-
-	// get last element from the string
-	// because the string ends and it might not have whitespace
-	// so it would not separate from the string.
-	char *last_element = substr(s, len, strlen(s));
-
-	if (!is_directory_exists(last_element))
-		CMD("mkdir", last_element);
 }
+
+void create_directories_from_path(const char *path)
+{
+	size_t n;
+	char **d = separate('/', path, &n);
+
+	size_t p2 = 0;
+	for (size_t i = 0; i < n; ++i)
+	{
+		char *d_name = d[i];
+		p2 += strlen(d_name) + 1;
+
+		char *ss = substr(path, 0, p2);
+
+		if (!is_directory_exists(ss))
+			CMD("mkdir", ss);
+
+		free(ss);
+	}
+
+	free(d);
+}
+
+void download(size_t n, struct download_info d_info[n])
+{
+	for (size_t i = 0; i < n; ++i)
+	{
+		struct download_info df = d_info[i];
+
+		create_directories_from_path(df.out_dir);
+
+		const char *path = writef("%s%s", df.out_dir, df.filename);
+		if (!is_file_exists(path))
+			CMD("curl", "-L", "-o", path, df.url);
+
+		if (df.extract && !is_directory_exists(df.extract_in_dir))
+		{
+			create_directories_from_path(df.extract_in_dir);
+			CMD((char*)df.tar_command, (char*)path, "-C", df.extract_in_dir, "-v");
+		}
+	}
+}
+
 
 /*
  * build_itself()
